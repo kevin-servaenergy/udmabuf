@@ -2,19 +2,19 @@
  *
  *       Copyright (C) 2015-2022 Ichiro Kawazome
  *       All rights reserved.
- * 
+ *
  *       Redistribution and use in source and binary forms, with or without
  *       modification, are permitted provided that the following conditions
  *       are met:
- * 
+ *
  *         1. Redistributions of source code must retain the above copyright
  *            notice, this list of conditions and the following disclaimer.
- * 
+ *
  *         2. Redistributions in binary form must reproduce the above copyright
  *            notice, this list of conditions and the following disclaimer in
  *            the documentation and/or other materials provided with the
  *            distribution.
- * 
+ *
  *       THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *       "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *       LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -23,10 +23,10 @@
  *       SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
  *       LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
  *       DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *       THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
+ *       THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  *       (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *       OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  ********************************************************************************/
 #include <linux/cdev.h>
 #include <linux/clk.h>
@@ -59,7 +59,7 @@
 #include <asm/byteorder.h>
 
 /**
- * DOC: Udmabuf Constants 
+ * DOC: Udmabuf Constants
  */
 
 MODULE_DESCRIPTION("User space mappable DMA buffer device driver");
@@ -205,7 +205,7 @@ struct udmabuf_device_data {
 /**
  * DOC: Udmabuf System Class Device File Description
  *
- * This section define the device file created in system class when udmabuf is 
+ * This section define the device file created in system class when udmabuf is
  * loaded into the kernel.
  *
  * The device file created in system class is as follows.
@@ -221,7 +221,7 @@ struct udmabuf_device_data {
  * * /sys/class/udmabuf/<device-name>/sync_for_cpu
  * * /sys/class/udmabuf/<device-name>/sync_for_device
  * * /sys/class/udmabuf/<device-name>/dma_coherent
- * * 
+ * *
  */
 
 #define  SYNC_COMMAND_DIR_MASK        (0x000000000000000C)
@@ -233,7 +233,7 @@ struct udmabuf_device_data {
 #define  SYNC_COMMAND_ARGMENT_MASK    (0xFFFFFFFFFFFFFFFE)
 /**
  * udmabuf_sync_command_argments() - get argment for dma_sync_single_for_cpu() or dma_sync_single_for_device()
- *                                  
+ *
  * @this:       Pointer to the udmabuf device data structure.
  * @command     sync command (this->sync_for_cpu or this->sync_for_device)
  * @phys_addr   Pointer to the phys_addr for dma_sync_single_for_...()
@@ -270,7 +270,7 @@ static int udmabuf_sync_command_argments(
     *phys_addr = this->phys_addr + sync_offset;
     *size      = sync_size;
     return 0;
-} 
+}
 
 /**
  * udmabuf_sync_for_cpu() - call dma_sync_single_for_cpu() when (sync_for_cpu != 0)
@@ -993,7 +993,7 @@ static int udmabuf_device_setup(struct udmabuf_device_data* this)
      */
     this->alloc_size = ((this->size + ((1 << PAGE_SHIFT) - 1)) >> PAGE_SHIFT) << PAGE_SHIFT;
     /*
-     * dma buffer allocation 
+     * dma buffer allocation
      */
     this->virt_addr  = dma_alloc_coherent(this->dma_dev, this->alloc_size, &this->phys_addr, GFP_KERNEL);
     if (IS_ERR_OR_NULL(this->virt_addr)) {
@@ -1131,7 +1131,7 @@ static int  udmabuf_get_device_name_property(struct device *dev, const char** na
  * @lock:       use mutex_lock()/mutex_unlock()
  * Return:      Success(=0) or error status(<0).
  */
-static int  udmabuf_get_size_property(struct device *dev, u64* value, bool lock)
+int  udmabuf_get_size_property(struct device *dev, u64* value, bool lock)
 {
 #if (USE_DEV_PROPERTY == 0)
     int                             status = -1;
@@ -1153,6 +1153,7 @@ static int  udmabuf_get_size_property(struct device *dev, u64* value, bool lock)
     return device_property_read_u64(dev, "size", value);
 #endif
 }
+EXPORT_SYMBOL(udmabuf_get_size_property);
 
 /**
  * udmabuf_get_minor_number_property() - Get "minor-number" property from udmabuf device.
@@ -1177,7 +1178,7 @@ static int  udmabuf_get_minor_number_property(struct device *dev, u32* value, bo
             break;
         }
     }
-    if (lock) 
+    if (lock)
         mutex_unlock(&udmabuf_platform_device_sem);
     return status;
 #else
@@ -1186,12 +1187,49 @@ static int  udmabuf_get_minor_number_property(struct device *dev, u32* value, bo
 }
 
 /**
+ * udmabuf_get_phys_addr_property() - Get "phys_addr" property from udmabuf device.
+ * @dev:        handle to the device structure.
+ * @value:      pointer to address of number value.
+ * @lock:       use mutex_lock()/mutex_unlock()
+ * Return:      Success(=0) or error status(<0).
+ */
+
+int udmabuf_get_phys_addr_property(struct device *dev, u32 *value, bool lock)
+{
+    int status = -1;
+    struct udmabuf_device_data *this;
+    struct udmabuf_platform_device* plat;
+    char buf[sizeof(void *) * 3];
+
+    if (lock)
+        mutex_lock(&udmabuf_platform_device_sem);
+    list_for_each_entry(plat, &udmabuf_platform_device_list, list) {
+        if (plat->dev == dev) {
+            status = 0;
+            break;
+        }
+    }
+    if (lock)
+        mutex_unlock(&udmabuf_platform_device_sem);
+
+    if (status == 0) {
+        if (!plat->dev) return -ENODEV;
+        this = dev_get_drvdata(plat->dev);
+        if(!this) return -ENODEV;
+        sprintf(buf, "%pad", &this->phys_addr);
+        status = kstrtou32(buf, 16, value);
+    }
+    return status;
+}
+EXPORT_SYMBOL(udmabuf_get_phys_addr_property);
+
+/**
  * udmabuf_platform_device_search()    - Search udmabuf platform device from list by name or number.
  * @name:       device name or NULL.
  * @id:         device id.
  * Return:      Pointer to the udmabuf_platform_device or NULL.
  */
-static struct udmabuf_platform_device* udmabuf_platform_device_search(const char* name, int id)
+struct udmabuf_platform_device* udmabuf_platform_device_search(const char* name, int id)
 {
     struct udmabuf_platform_device* plat;
     struct udmabuf_platform_device* found_plat = NULL;
@@ -1202,14 +1240,14 @@ static struct udmabuf_platform_device* udmabuf_platform_device_search(const char
         if (name != NULL) {
             const char* device_name;
             found_by_name = false;
-            if (udmabuf_get_device_name_property(plat->dev, &device_name, false) == 0) 
+            if (udmabuf_get_device_name_property(plat->dev, &device_name, false) == 0)
                 if (strcmp(name, device_name) == 0)
                     found_by_name = true;
         }
         if (id >= 0) {
             u32 minor_number;
             found_by_id = false;
-            if (udmabuf_get_minor_number_property(plat->dev, &minor_number, false) == 0) 
+            if (udmabuf_get_minor_number_property(plat->dev, &minor_number, false) == 0)
                 if (id == minor_number)
                     found_by_id = true;
         }
@@ -1227,7 +1265,7 @@ static struct udmabuf_platform_device* udmabuf_platform_device_search(const char
  * @size:       buffer size.
  * Return:      Success(=0) or error status(<0).
  */
-static int udmabuf_platform_device_create(const char* name, int id, unsigned int size)
+int udmabuf_platform_device_create(const char* name, int id, unsigned int size)
 {
     struct platform_device*         pdev       = NULL;
     struct udmabuf_platform_device* plat       = NULL;
@@ -1310,7 +1348,7 @@ static int udmabuf_platform_device_create(const char* name, int id, unsigned int
     list_add_tail(&plat->list, &udmabuf_platform_device_list);
     list_added = true;
     mutex_unlock(&udmabuf_platform_device_sem);
-    
+
     retval = platform_device_add(pdev);
     if (retval != 0) {
         dev_err(&pdev->dev, "platform_device_add failed. return=%d\n", retval);
@@ -1484,12 +1522,12 @@ static int of_property_read_ulong(const struct device_node* node, const char* pr
         *out_value = u64_value;
         return 0;
     }
-      
+
     if ((retval = of_property_read_u32(node, propname, &u32_value)) == 0) {
         *out_value = (u64)u32_value;
         return 0;
     }
-      
+
     return retval;
 }
 
@@ -1609,8 +1647,8 @@ static int udmabuf_device_probe(struct device *dev)
      * - call arch_setup_dma_ops()
      */
 #if ((USE_OF_RESERVED_MEM == 1) && (LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0)))
-    /* 
-     * Under less than Linux Kernel 5.1, if "memory-region" property is specified, 
+    /*
+     * Under less than Linux Kernel 5.1, if "memory-region" property is specified,
      * of_dma_configure() will not be executed.
      * Because in that case, it is already executed in of_reserved_mem_device_init().
      */
@@ -1727,7 +1765,7 @@ static int udmabuf_platform_driver_probe(struct platform_device *pdev)
     dev_dbg(&pdev->dev, "driver probe start.\n");
 
     retval = udmabuf_device_probe(&pdev->dev);
-    
+
     if (info_enable) {
         dev_info(&pdev->dev, "driver installed.\n");
     }
@@ -1791,7 +1829,7 @@ static struct platform_driver udmabuf_platform_driver = {
  * * udmabuf_manager_file_ops          - udmabuf manager file operation table.
  * * udmabuf_manager_device            - udmabuf manager misc device structure.
  * * udmabuf_manager_device_registerd  - udmabuf manager device registerd flag.
- * * 
+ * *
  */
 #if (UDMABUF_MGR_ENABLE == 1)
 #include <linux/miscdevice.h>
@@ -1917,7 +1955,7 @@ static int udmabuf_manager_parse(struct udmabuf_manager_data *this, const char _
         }
     }
 failed:
-    return parse_count;    
+    return parse_count;
 }
 
 /**
@@ -1951,7 +1989,7 @@ static int udmabuf_manager_file_open(struct inode *inode, struct file *file)
 static int udmabuf_manager_file_release(struct inode *inode, struct file *file)
 {
     struct udmabuf_manager_data* this = file->private_data;
-    if (this != NULL) 
+    if (this != NULL)
         kfree(this);
     return 0;
 }
@@ -1976,7 +2014,7 @@ static ssize_t udmabuf_manager_file_write(struct file* file, const char __user* 
 
     if (udmabuf_manager_buffer_overflow(this))
         return -ENOSPC;
-    
+
     while(xfer_size < count) {
         int parse_size = udmabuf_manager_parse(this, buff + xfer_size, count - xfer_size);
         if (parse_size < 0) {
@@ -2023,6 +2061,102 @@ static ssize_t udmabuf_manager_file_write(struct file* file, const char __user* 
   failed:
     return result;
 }
+
+int udmabuf_manager_create(const char *device_name, unsigned int size)
+{
+    struct udmabuf_manager_data* this;
+    int result = 0;
+
+    this = kzalloc(sizeof(*this), GFP_KERNEL);
+    if (IS_ERR_OR_NULL(this)) {
+        result = PTR_ERR(this);
+    } else {
+        result = 0;
+        udmabuf_manager_state_clear(this);
+    }
+
+    if (result) {
+        printk(KERN_ERR "Error alloc mgr data; result = %d\n", result);
+        return result;
+    }
+    this->state = udmabuf_manager_create_command;
+    this->device_name = device_name;
+    this->size = size;
+
+    printk(KERN_INFO "%s : create %s %d\n"  , UDMABUF_MGR_NAME, this->device_name, this->size);
+    result = udmabuf_platform_device_create(this->device_name, this->minor_number, this->size);
+    if (result == 0) {
+        udmabuf_manager_state_clear(this);
+    } else {
+        printk(KERN_ERR "%s : create error: %s result = %d\n", UDMABUF_MGR_NAME, this->device_name, result);
+        udmabuf_manager_state_clear(this);
+    }
+    return result;
+}
+EXPORT_SYMBOL(udmabuf_manager_create);
+
+int udmabuf_manager_delete(const char *device_name)
+{
+    struct udmabuf_manager_data* this;
+    struct udmabuf_platform_device* plat;
+    int result = 0;
+
+    this = kzalloc(sizeof(*this), GFP_KERNEL);
+    if (IS_ERR_OR_NULL(this)) {
+        result = PTR_ERR(this);
+    } else {
+        result = 0;
+        udmabuf_manager_state_clear(this);
+    }
+
+    if (result) {
+        printk(KERN_ERR "Error alloc mgr data; result = %d\n", result);
+        return result;
+    }
+    this->state = udmabuf_manager_delete_command;
+    this->device_name = device_name;
+
+    printk(KERN_INFO "%s : delete %s\n"     , UDMABUF_MGR_NAME, this->device_name);
+    plat = udmabuf_platform_device_search(this->device_name, this->minor_number);
+    if (plat != NULL) {
+        udmabuf_platform_device_remove(plat);
+        udmabuf_manager_state_clear(this);
+    } else {
+        printk(KERN_ERR "%s : delete error: %s not found\n", UDMABUF_MGR_NAME, this->device_name);
+        udmabuf_manager_state_clear(this);
+        result = -EINVAL;
+    }
+    return result;
+}
+EXPORT_SYMBOL(udmabuf_manager_delete);
+
+/**
+ * udmabuf_manager_search()    - Search udmabuf manager platform device from list by name.
+ * @name:       device name or NULL.
+ * Return:      Pointer to the device stored in udmabuf platform device or NULL.
+ */
+struct device* udmabuf_manager_search(const char* name)
+{
+
+    struct device *dev = NULL;
+    struct udmabuf_manager_data* this;
+    struct udmabuf_platform_device* plat;
+    int result = 0;
+
+    this = kzalloc(sizeof(*this), GFP_KERNEL);
+    if (IS_ERR_OR_NULL(this)) {
+        result = PTR_ERR(this);
+    } else {
+        result = 0;
+        udmabuf_manager_state_clear(this);
+    }
+
+    if (result) return dev;
+    plat = udmabuf_platform_device_search(name, PLATFORM_DEVID_AUTO);
+    if (plat) dev = plat->dev;
+    return dev;
+}
+EXPORT_SYMBOL(udmabuf_manager_search);
 
 /**
  * udmabuf manager file operation table.
