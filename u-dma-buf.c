@@ -1187,19 +1187,17 @@ static int  udmabuf_get_minor_number_property(struct device *dev, u32* value, bo
 }
 
 /**
- * udmabuf_get_phys_addr_property() - Get "phys_addr" property from udmabuf device.
+ * udmabuf_device_data_from_device() - Get udmabuf device data from device.
  * @dev:        handle to the device structure.
- * @value:      pointer to address of number value.
+ * @this:       pointer to address of device data structure.
  * @lock:       use mutex_lock()/mutex_unlock()
  * Return:      Success(=0) or error status(<0).
  */
 
-int udmabuf_get_phys_addr_property(struct device *dev, u32 *value, bool lock)
+static int udmabuf_device_data_from_device(struct device *dev, struct udmabuf_device_data **this, bool lock)
 {
     int status = -1;
-    struct udmabuf_device_data *this;
     struct udmabuf_platform_device* plat;
-    char buf[sizeof(void *) * 3];
 
     if (lock)
         mutex_lock(&udmabuf_platform_device_sem);
@@ -1212,10 +1210,34 @@ int udmabuf_get_phys_addr_property(struct device *dev, u32 *value, bool lock)
     if (lock)
         mutex_unlock(&udmabuf_platform_device_sem);
 
+    if (!plat->dev)
+        return -ENODEV;
+    *this = dev_get_drvdata(plat->dev);
+    if (*this == NULL)
+        return -ENODEV;
+    return status;
+}
+
+/**
+ * udmabuf_get_phys_addr_property() - Get "phys_addr" property from udmabuf device.
+ * @dev:        handle to the device structure.
+ * @value:      pointer to address of number value.
+ * @lock:       use mutex_lock()/mutex_unlock()
+ * Return:      Success(=0) or error status(<0).
+ */
+
+int udmabuf_get_phys_addr_property(struct device *dev, u32 *value, bool lock)
+{
+    int status = -1;
+    struct udmabuf_device_data *this = NULL;
+    char buf[sizeof(uintptr_t) * 3];
+
+    status = udmabuf_device_data_from_device(dev, &this, lock);
+
     if (status == 0) {
-        if (!plat->dev) return -ENODEV;
-        this = dev_get_drvdata(plat->dev);
-        if(!this) return -ENODEV;
+        if (!this)
+            return -1;
+        // Probably a better way to do this
         sprintf(buf, "%pad", &this->phys_addr);
         status = kstrtou32(buf, 16, value);
     }
