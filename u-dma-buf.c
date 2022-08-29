@@ -2081,23 +2081,26 @@ static ssize_t udmabuf_manager_file_write(struct file* file, const char __user* 
     return result;
 }
 
+/**
+ * udmabuf_manager_create() - udmabuf manager create udmabuf.
+ * @device_name:    device name or NULL.
+ * @size:           buffer size.
+ * Return:          Success(=0) or error status(<0).
+ */
 int udmabuf_manager_create(const char *device_name, unsigned int size)
 {
-    struct udmabuf_manager_data* this;
+    struct udmabuf_manager_data *this;
     int result = 0;
 
     this = kzalloc(sizeof(*this), GFP_KERNEL);
     if (IS_ERR_OR_NULL(this)) {
         result = PTR_ERR(this);
+        goto failed;
     } else {
         result = 0;
         udmabuf_manager_state_clear(this);
     }
 
-    if (result) {
-        printk(KERN_ERR "Error alloc mgr data; result = %d\n", result);
-        return result;
-    }
     this->state = udmabuf_manager_create_command;
     this->device_name = device_name;
     this->size = size;
@@ -2110,19 +2113,29 @@ int udmabuf_manager_create(const char *device_name, unsigned int size)
         printk(KERN_ERR "%s : create error: %s result = %d\n", UDMABUF_MGR_NAME, this->device_name, result);
         udmabuf_manager_state_clear(this);
     }
-    return result;
+    failed:
+        if (this)
+            kfree(this);
+        return result;
 }
 EXPORT_SYMBOL(udmabuf_manager_create);
 
+/**
+ * udmabuf_manager_delete() - udmabuf manager delete udmabuf.
+ * @device_name:    device name or NULL.
+ * @size:           buffer size.
+ * Return:          Success(=0) or error status(<0).
+ */
 int udmabuf_manager_delete(const char *device_name)
 {
-    struct udmabuf_manager_data* this;
-    struct udmabuf_platform_device* plat;
+    struct udmabuf_manager_data *this;
+    struct udmabuf_platform_device *plat;
     int result = 0;
 
     this = kzalloc(sizeof(*this), GFP_KERNEL);
     if (IS_ERR_OR_NULL(this)) {
         result = PTR_ERR(this);
+        goto failed;
     } else {
         result = 0;
         udmabuf_manager_state_clear(this);
@@ -2145,7 +2158,10 @@ int udmabuf_manager_delete(const char *device_name)
         udmabuf_manager_state_clear(this);
         result = -EINVAL;
     }
-    return result;
+    failed:
+        if (this)
+            kfree(this);
+        return result;
 }
 EXPORT_SYMBOL(udmabuf_manager_delete);
 
