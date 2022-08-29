@@ -1189,7 +1189,7 @@ static int  udmabuf_get_minor_number_property(struct device *dev, u32* value, bo
 /**
  * udmabuf_device_data_from_device() - Get udmabuf device data from device.
  * @dev:        handle to the device structure.
- * @this:       pointer to address of device data structure.
+ * @this:       address of device data structure.
  * @lock:       use mutex_lock()/mutex_unlock()
  * Return:      Success(=0) or error status(<0).
  */
@@ -1221,25 +1221,22 @@ static int udmabuf_device_data_from_device(struct device *dev, struct udmabuf_de
 /**
  * udmabuf_get_phys_addr_property() - Get "phys_addr" property from udmabuf device.
  * @dev:        handle to the device structure.
- * @value:      pointer to address of number value.
+ * @value:      address of value.
  * @lock:       use mutex_lock()/mutex_unlock()
  * Return:      Success(=0) or error status(<0).
  */
 
-int udmabuf_get_phys_addr_property(struct device *dev, u32 *value, bool lock)
+int udmabuf_get_phys_addr_property(struct device *dev, dma_addr_t *value, bool lock)
 {
     int status = -1;
     struct udmabuf_device_data *this = NULL;
-    char buf[sizeof(uintptr_t) * 3];
 
     status = udmabuf_device_data_from_device(dev, &this, lock);
 
     if (status == 0) {
         if (!this)
-            return -1;
-        // Probably a better way to do this
-        sprintf(buf, "%pad", &this->phys_addr);
-        status = kstrtou32(buf, 16, value);
+            return -ENODEV;
+        *value = this->phys_addr;
     }
     return status;
 }
